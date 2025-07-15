@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
   SheetTitle,
   SheetPortal,
   SheetPrimitive,
@@ -23,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useTheme } from 'next-themes'
 import { ReactNode } from "react";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
@@ -164,6 +168,7 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { theme } = useTheme ? useTheme() : { theme: undefined };
 
   if (collapsible === "none") {
     return (

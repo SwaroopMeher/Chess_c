@@ -27,7 +27,7 @@ export default function MatchesPage() {
   const { user } = useUser()
   const { tournamentState } = useTournament()
   const [matches, setMatches] = useState<Match[]>([])
-  const [players, setPlayers] = useState<Array<{ id: string; name?: string; [key: string]: unknown }>>([])
+  const [players, setPlayers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [submittingResult, setSubmittingResult] = useState<string | null>(null)
 
@@ -44,7 +44,7 @@ export default function MatchesPage() {
         
         setMatches(matchesResult.data as Match[])
         setPlayers(playersResult.data || [])
-      } catch {
+      } catch (error) {
         toast.error('Failed to load data')
       } finally {
         setLoading(false)
@@ -58,7 +58,7 @@ export default function MatchesPage() {
       .channel('matches-page-changes')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'matches' }, 
-        () => {
+        (payload) => {
           fetchData() // Refetch matches on any change
         }
       )
@@ -91,7 +91,7 @@ export default function MatchesPage() {
       if (error) throw error
       setMatches(data as Match[])
 
-    } catch {
+    } catch (error) {
       toast.error('Failed to submit result')
     } finally {
       setSubmittingResult(null)
@@ -131,8 +131,8 @@ export default function MatchesPage() {
   }
 
   const getMatchesByStatus = () => {
-    const pending: Match[] = matches.filter(m => !m.result)
-    const completed: Match[] = matches.filter(m => m.result)
+    const pending = matches.filter(m => !m.result)
+    const completed = matches.filter(m => m.result)
     return { pending, completed }
   }
 

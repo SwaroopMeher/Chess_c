@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs'
+import { SidebarProvider } from "@/components/ui/sidebar"
 import { ThemeProvider } from "@/lib/theme"
 import { TournamentProvider } from "@/lib/tournament-context"
 import { AuthWrapper } from "@/components/auth-wrapper"
 import { Squares } from "@/components/ui/squares-background"
 import { Toaster } from 'sonner'
+import { ClientLayoutWrapper } from "@/components/ClientLayoutWrapper";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -47,23 +49,8 @@ export default function RootLayout({
             defaultTheme="system"
             enableSystem
           >
-            <div className="relative h-full w-full">
-              <div className="fixed inset-0 -z-10">
-                <Squares
-                  direction="diagonal"
-                  speed={0.5}
-                  squareSize={50}
-                  hoverFillColor="hsl(var(--accent))"
-                  className="opacity-30"
-                />
-              </div>
-              <AuthWrapper>
-                <TournamentProvider>
-                  {children}
-                </TournamentProvider>
-              </AuthWrapper>
-              <Toaster />
-            </div>
+            <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+            <Toaster />
           </ThemeProvider>
         </body>
       </html>

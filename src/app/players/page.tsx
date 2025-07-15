@@ -65,7 +65,7 @@ export default function PlayersPage() {
       .channel('players-page-changes')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'players' }, 
-        () => {
+        (payload) => {
           fetchPlayers() // Refetch to ensure consistency
         }
       )
@@ -157,8 +157,6 @@ export default function PlayersPage() {
                   <Button 
                     type="submit" 
                     disabled={form.formState.isSubmitting}
-                    variant="outline"
-                    size="lg"
                   >
                     {form.formState.isSubmitting ? 'Registering...' : 'Register'}
                   </Button>
