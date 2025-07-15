@@ -8,7 +8,6 @@ import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { Squares } from '@/components/ui/squares-background'
 import { 
   DropdownMenu,
   DropdownMenuContent,

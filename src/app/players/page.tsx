@@ -65,7 +65,7 @@ export default function PlayersPage() {
       .channel('players-page-changes')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'players' }, 
-        (payload) => {
+        () => {
           fetchPlayers() // Refetch to ensure consistency
         }
       )

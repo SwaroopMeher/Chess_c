@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs'
-import { SidebarProvider } from "@/components/ui/sidebar"
 import { ThemeProvider } from "@/lib/theme"
-import { TournamentProvider } from "@/lib/tournament-context"
-import { AuthWrapper } from "@/components/auth-wrapper"
-import { Squares } from "@/components/ui/squares-background"
 import { Toaster } from 'sonner'
 import { ClientLayoutWrapper } from "@/components/ClientLayoutWrapper";
 import "./globals.css";
