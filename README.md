@@ -268,11 +268,11 @@ The application can be deployed to any platform that supports Next.js:
 For issues and questions:
 1. Check the GitHub issues page
 2. Review the documentation
-3. Contact the development team
+3. Contact the developer: swaroop.malina@gmail.com
 
 ## License
 
-This project is private and proprietary. All rights reserved.
+This project is open source and available under the [MIT License](LICENSE).
 
 ## Acknowledgments
 
