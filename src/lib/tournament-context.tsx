@@ -266,7 +266,7 @@ export function TournamentProvider({ children }: { children: React.ReactNode }) 
       if (data) {
         dispatch({ type: 'SET_TOURNAMENT_STATE', payload: data })
       }
-    } catch (error) {
+    } catch {
       // Update local state if database update fails
       dispatch({ 
         type: 'SET_TOURNAMENT_STATE', 
@@ -289,7 +289,7 @@ export function TournamentProvider({ children }: { children: React.ReactNode }) 
       if (data) {
         dispatch({ type: 'SET_TOURNAMENT_STATE', payload: data })
       }
-    } catch (error) {
+    } catch {
       // Update local state if database update fails
       dispatch({ 
         type: 'SET_TOURNAMENT_STATE', 
@@ -312,7 +312,7 @@ export function TournamentProvider({ children }: { children: React.ReactNode }) 
       if (data) {
         dispatch({ type: 'SET_TOURNAMENT_STATE', payload: data })
       }
-    } catch (error) {
+    } catch {
       // Update local state if database update fails
       dispatch({ 
         type: 'SET_TOURNAMENT_STATE', 

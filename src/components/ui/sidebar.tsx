@@ -23,7 +23,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useTheme } from 'next-themes'
 import { ReactNode } from "react";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
@@ -165,7 +164,6 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
-  const { theme } = useTheme();
 
   if (collapsible === "none") {
     return (

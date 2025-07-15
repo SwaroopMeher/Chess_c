@@ -1,5 +1,4 @@
 import { SignUp } from '@clerk/nextjs'
-import { Squares } from "@/components/ui/squares-background"
 import { BackgroundPaths } from "@/components/ui/background-paths";
 
 export default function SignUpPage() {

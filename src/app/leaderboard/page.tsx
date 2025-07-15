@@ -85,7 +85,7 @@ export default function LeaderboardPage() {
 
       setLeaderboard(sortedStats)
 
-    } catch (error) {
+    } catch {
       // Error calculating leaderboard
     } finally {
       setLoading(false)
@@ -99,8 +99,8 @@ export default function LeaderboardPage() {
     const subscription = supabase
       .channel('leaderboard-updates')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'matches' }, 
-        (payload) => {
+        { event: '*', schema: 'public', table: 'leaderboard' }, 
+        () => {
           calculateLeaderboard()
         }
       )
