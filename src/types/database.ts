@@ -1,6 +1,72 @@
 export interface Database {
   public: {
     Tables: {
+      tournaments: {
+        Row: {
+          id: string
+          name: string
+          description?: string
+          format: string
+          max_players: number
+          total_rounds: number
+          registration_open: boolean
+          is_active: boolean
+          start_date?: string
+          end_date?: string
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string
+          format?: string
+          max_players?: number
+          total_rounds?: number
+          registration_open?: boolean
+          is_active?: boolean
+          start_date?: string
+          end_date?: string
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          format?: string
+          max_players?: number
+          total_rounds?: number
+          registration_open?: boolean
+          is_active?: boolean
+          start_date?: string
+          end_date?: string
+          created_by?: string
+          updated_at?: string
+        }
+      }
+      tournament_registrations: {
+        Row: {
+          id: string
+          tournament_id: string
+          player_id: string
+          registered_at: string
+        }
+        Insert: {
+          id?: string
+          tournament_id: string
+          player_id: string
+          registered_at?: string
+        }
+        Update: {
+          id?: string
+          tournament_id?: string
+          player_id?: string
+          registered_at?: string
+        }
+      }
       players: {
         Row: {
           id: string
@@ -54,6 +120,7 @@ export interface Database {
       matches: {
         Row: {
           id: string
+          tournament_id: string
           white_player_id: string
           black_player_id: string
           white_player_name: string
@@ -66,6 +133,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          tournament_id: string
           white_player_id: string
           black_player_id: string
           white_player_name: string

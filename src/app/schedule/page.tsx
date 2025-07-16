@@ -1,173 +1,64 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useUser } from '@clerk/nextjs'
-import { isAdminUser, supabase } from '@/lib/supabase'
+import { isAdminUser } from '@/lib/supabase'
+import { useTournament } from '@/lib/tournament-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { toast } from 'sonner'
-import { Calendar, Users, Trophy } from 'lucide-react'
-
-interface Player {
-  id: string
-  name: string
-  lichess_username?: string
-}
-
-interface Match {
-  id: string
-  round: number
-  white_player_id: string
-  black_player_id: string
-  white_player_name: string
-  black_player_name: string
-  result?: string
-  scheduled_at?: string
-}
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Calendar, Users, Trophy, AlertCircle, FileText, Info, RefreshCw } from 'lucide-react'
 
 export default function SchedulePage() {
   const { user } = useUser()
-  const [players, setPlayers] = useState<Player[]>([])
-  const [matches, setMatches] = useState<Match[]>([])
-  const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
+  const { state, getMatchesByTournament, getTournamentById, getPlayersByTournament, activateTournament, regenerateSchedule, isLoading } = useTournament()
+  const [selectedTournamentId, setSelectedTournamentId] = useState<string>('')
+  const [isRegenerating, setIsRegenerating] = useState(false)
 
   const isAdmin = user?.primaryEmailAddress?.emailAddress
     ? isAdminUser(user.primaryEmailAddress.emailAddress)
     : false
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [playersResult, matchesResult] = await Promise.all([
-          supabase.from('players').select('*').order('name'),
-          supabase.from('matches').select('*').order('round', { ascending: true })
-        ])
-
-        if (playersResult.error) throw playersResult.error
-        if (matchesResult.error) throw matchesResult.error
-
-        setPlayers(playersResult.data as Player[])
-        setMatches(matchesResult.data as Match[])
-      } catch (error) {
-        console.error('Error fetching data:', error)
-        toast.error('Failed to load schedule data')
-      } finally {
-        setLoading(false)
-      }
+  // Auto-select first active tournament if none selected, clear if selected is inactive
+  React.useEffect(() => {
+    const activeTournaments = state.tournaments.filter(t => t.is_active)
+    
+    if (!selectedTournamentId && activeTournaments.length > 0) {
+      setSelectedTournamentId(activeTournaments[0].id)
+    } else if (selectedTournamentId && !activeTournaments.some(t => t.id === selectedTournamentId)) {
+      // If currently selected tournament is not active, clear selection
+      setSelectedTournamentId(activeTournaments.length > 0 ? activeTournaments[0].id : '')
     }
+  }, [state.tournaments, selectedTournamentId])
 
-    fetchData()
-  }, [])
+  const selectedTournament = getTournamentById(selectedTournamentId)
+  const players = selectedTournamentId ? getPlayersByTournament(selectedTournamentId) : []
+  const matches = selectedTournamentId ? getMatchesByTournament(selectedTournamentId) : []
+  const activeTournaments = state.tournaments.filter(t => t.is_active)
 
-  // Generate Round-Robin schedule
   const generateSchedule = async () => {
-    if (players.length < 2) {
-      toast.error('At least 2 players are required to generate a schedule')
-      return
-    }
-
-    setGenerating(true)
-    try {
-      // Delete existing matches
-      await supabase.from('matches').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-
-      const rounds = generateRoundRobinSchedule(players)
-      const matchesToInsert = []
-
-      for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
-        const round = rounds[roundIndex]
-        for (const match of round) {
-          matchesToInsert.push({
-            round: roundIndex + 1,
-            white_player_id: match.white.id,
-            black_player_id: match.black.id,
-            white_player_name: match.white.name,
-            black_player_name: match.black.name,
-            scheduled_at: new Date().toISOString()
-          })
-        }
-      }
-
-      const { error } = await supabase.from('matches').insert(matchesToInsert)
-      if (error) throw error
-
-      // Refetch matches
-      const { data: newMatches, error: fetchError } = await supabase
-        .from('matches')
-        .select('*')
-        .order('round', { ascending: true })
-
-      if (fetchError) throw fetchError
-      setMatches(newMatches as Match[])
-
-      toast.success(`Schedule generated! ${matchesToInsert.length} matches created.`)
-    } catch (error) {
-      console.error('Error generating schedule:', error)
-      toast.error('Failed to generate schedule')
-    } finally {
-      setGenerating(false)
-    }
+    if (!selectedTournamentId) return
+    await activateTournament(selectedTournamentId)
   }
 
-  // Round-Robin algorithm
-  const generateRoundRobinSchedule = (players: Player[]) => {
-    const playersCopy = [...players]
+  const handleRegenerateSchedule = async () => {
+    if (!selectedTournamentId) return
     
-    // If odd number of players, add a "bye" player
-    if (playersCopy.length % 2 === 1) {
-      playersCopy.push({ id: 'bye', name: 'BYE' })
+    setIsRegenerating(true)
+    try {
+      await regenerateSchedule(selectedTournamentId)
+    } catch (error) {
+      console.error('Failed to regenerate schedule:', error)
+    } finally {
+      setIsRegenerating(false)
     }
-
-    const numPlayers = playersCopy.length
-    const numRounds = numPlayers - 1
-    const matchesPerRound = numPlayers / 2
-
-    const rounds = []
-
-    for (let round = 0; round < numRounds; round++) {
-      const roundMatches = []
-      
-      for (let match = 0; match < matchesPerRound; match++) {
-        const home = (round + match) % (numPlayers - 1)
-        const away = (numPlayers - 1 - match + round) % (numPlayers - 1)
-        
-        // Last player stays fixed
-        if (match === 0) {
-          const player1 = playersCopy[numPlayers - 1]
-          const player2 = playersCopy[home]
-          
-          if (player1.id !== 'bye' && player2.id !== 'bye') {
-            roundMatches.push({
-              white: player1,
-              black: player2
-            })
-          }
-        } else {
-          const player1 = playersCopy[home]
-          const player2 = playersCopy[away]
-          
-          if (player1.id !== 'bye' && player2.id !== 'bye') {
-            roundMatches.push({
-              white: player1,
-              black: player2
-            })
-          }
-        }
-      }
-      
-      if (roundMatches.length > 0) {
-        rounds.push(roundMatches)
-      }
-    }
-
-    return rounds
   }
 
   const getMatchesByRound = () => {
-    const matchesByRound: { [key: number]: Match[] } = {}
+    const matchesByRound: { [key: number]: any[] } = {}
     matches.forEach(match => {
       if (!matchesByRound[match.round]) {
         matchesByRound[match.round] = []
@@ -192,13 +83,13 @@ export default function SchedulePage() {
     }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Schedule</h2>
           <p className="text-muted-foreground">
-            View the tournament schedule and upcoming matches.
+            View tournament schedules and upcoming matches.
           </p>
         </div>
         <div className="grid gap-4">
@@ -215,34 +106,149 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Tournament Schedule</h2>
-          <p className="text-muted-foreground">
-            {hasMatches ? 'Round-Robin tournament schedule' : 'Generate the tournament schedule'}
-          </p>
-        </div>
-        {isAdmin && (
-          <Button 
-            onClick={generateSchedule} 
-            disabled={generating || players.length < 2}
-            className="gap-2"
-          >
-            <Calendar className="h-4 w-4" />
-            {generating ? 'Generating...' : hasMatches ? 'Regenerate Schedule' : 'Generate Schedule'}
-          </Button>
-        )}
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Tournament Schedule</h2>
+        <p className="text-muted-foreground">
+          View tournament schedules and upcoming matches by tournament
+        </p>
       </div>
 
-      {!hasMatches ? (
+      {/* Tournament Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5" />
+            Select Tournament
+          </CardTitle>
+          <CardDescription>
+            Choose a tournament to view its schedule
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedTournamentId} onValueChange={setSelectedTournamentId}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select an active tournament" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border border-border">
+              {activeTournaments.length === 0 ? (
+                <div className="p-2 text-center text-muted-foreground text-sm">
+                  No active tournaments available
+                </div>
+              ) : (
+                activeTournaments.map((tournament) => (
+                  <SelectItem key={tournament.id} value={tournament.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{tournament.name}</span>
+                      <Badge variant="default" className="text-xs">Active</Badge>
+                    </div>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+          {selectedTournament && (
+            <div className="mt-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-4">
+                <span>Format: {selectedTournament.format}</span>
+                <span>•</span>
+                <span>Players: {players.length}</span>
+                <span>•</span>
+                <span>Rounds: {selectedTournament.total_rounds}</span>
+                <span>•</span>
+                <span>Status: {selectedTournament.is_active ? 'Active' : 'Inactive'}</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tournament Rules Section */}
+      {selectedTournament && (selectedTournament.rules || selectedTournament.format) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5" />
-              Ready to Start?
+              <FileText className="h-5 w-5" />
+              Tournament Information
             </CardTitle>
             <CardDescription>
-              Generate the tournament schedule to begin the competition.
+              Rules and format details for {selectedTournament.name}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Format Information */}
+            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Format: {selectedTournament.format}</h4>
+                  <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                    {selectedTournament.format === 'Round Robin' && (
+                      <>
+                        <p>• Every player plays against every other player exactly once</p>
+                        <p>• Fair color distribution: players get equal opportunities as white and black</p>
+                      </>
+                    )}
+                    {selectedTournament.format === 'Swiss' && (
+                      <>
+                        <p>• Players are paired based on performance and ratings</p>
+                        <p>• Fair color distribution: alternating colors based on seeding</p>
+                        <p>• Stronger players face stronger opponents as tournament progresses</p>
+                        <p>• Total rounds: {selectedTournament.total_rounds}</p>
+                      </>
+                    )}
+                    <p>• Max players: {selectedTournament.max_players}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Rules */}
+            {selectedTournament.rules && (
+              <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-2">Tournament Rules</h4>
+                    <div className="text-sm text-amber-800 dark:text-amber-200 whitespace-pre-wrap">
+                      {selectedTournament.rules}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTournaments.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Active Tournaments</h3>
+            <p className="text-muted-foreground text-center">
+              There are no active tournaments available. Tournament admin needs to activate a tournament first.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !selectedTournamentId ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Trophy className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">Select a Tournament</h3>
+            <p className="text-muted-foreground text-center">
+              Choose an active tournament above to view its schedule
+            </p>
+          </CardContent>
+        </Card>
+      ) : !hasMatches ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              No Schedule Generated
+            </CardTitle>
+            <CardDescription>
+              {selectedTournament?.name} schedule hasn't been generated yet.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -253,9 +259,19 @@ export default function SchedulePage() {
             <p className="text-muted-foreground">
               {players.length < 2 
                 ? 'At least 2 players are required to generate a schedule.'
-                : `A Round-Robin schedule will be generated with ${(players.length * (players.length - 1)) / 2} total matches.`
+                : `Activate the tournament to generate matches for ${selectedTournament?.format} format.`
               }
             </p>
+            {isAdmin && players.length >= 2 && (
+              <Button 
+                onClick={generateSchedule} 
+                disabled={players.length < 2}
+                className="gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                Activate Tournament & Generate Schedule
+              </Button>
+            )}
             {!isAdmin && (
               <p className="text-sm text-amber-600">
                 Only the tournament administrator can generate the schedule.
@@ -265,6 +281,70 @@ export default function SchedulePage() {
         </Card>
       ) : (
         <div className="space-y-6">
+          {/* Regenerate Schedule Button */}
+          {isAdmin && selectedTournament && matches.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <RefreshCw className="h-5 w-5" />
+                  Schedule Management
+                </CardTitle>
+                <CardDescription>
+                  Regenerate the tournament schedule (this will clear all existing matches and results)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="destructive" className="gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      Regenerate Schedule
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Regenerate Tournament Schedule</DialogTitle>
+                      <DialogDescription asChild>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                          <div>
+                            <strong>Warning:</strong> This action will permanently delete all existing matches and match results for "{selectedTournament.name}".
+                          </div>
+                          <div>
+                            A new schedule will be generated with the currently registered players. This action cannot be undone.
+                          </div>
+                          <div>
+                            Are you sure you want to proceed?
+                          </div>
+                        </div>
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline">Cancel</Button>
+                      <Button 
+                        variant="destructive" 
+                        onClick={handleRegenerateSchedule}
+                        disabled={isRegenerating}
+                        className="gap-2"
+                      >
+                        {isRegenerating ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Regenerating...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4" />
+                            Yes, Regenerate Schedule
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </CardContent>
+            </Card>
+          )}
+          
           <div className="grid gap-6">
             {Object.entries(matchesByRound)
               .sort(([a], [b]) => parseInt(a) - parseInt(b))

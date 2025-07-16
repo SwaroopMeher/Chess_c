@@ -80,29 +80,46 @@ A modern, full-featured chess tournament management system built with Next.js 15
    Create the following tables in your Supabase database:
 
    ```sql
-   -- Tournament state table
-   CREATE TABLE tournament_state (
-     id SERIAL PRIMARY KEY,
-     tournament_name VARCHAR(255) NOT NULL DEFAULT 'Chess Tournament',
-     tournament_format VARCHAR(50) NOT NULL DEFAULT 'Swiss',
-     registration_closed BOOLEAN NOT NULL DEFAULT FALSE,
+   -- Tournaments table
+   CREATE TABLE tournaments (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     name VARCHAR(255) NOT NULL,
+     description TEXT,
+     format VARCHAR(50) NOT NULL DEFAULT 'Swiss',
+     max_players INTEGER DEFAULT 32,
+     total_rounds INTEGER DEFAULT 7,
+     registration_open BOOLEAN NOT NULL DEFAULT TRUE,
      is_active BOOLEAN NOT NULL DEFAULT FALSE,
+     start_date TIMESTAMP WITH TIME ZONE,
+     end_date TIMESTAMP WITH TIME ZONE,
+     created_by VARCHAR(255) NOT NULL,
      created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
      updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
    );
 
-   -- Players table
+   -- Players table (global players)
    CREATE TABLE players (
      id VARCHAR(255) PRIMARY KEY,
      name VARCHAR(255) NOT NULL,
      email VARCHAR(255) UNIQUE NOT NULL,
      rating INTEGER DEFAULT 1200,
+     lichess_username VARCHAR(255),
      created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
    );
 
-   -- Matches table
+   -- Tournament registrations (many-to-many relationship)
+   CREATE TABLE tournament_registrations (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     tournament_id UUID REFERENCES tournaments(id) ON DELETE CASCADE,
+     player_id VARCHAR(255) REFERENCES players(id) ON DELETE CASCADE,
+     registered_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
+     UNIQUE(tournament_id, player_id)
+   );
+
+   -- Matches table (tournament-specific)
    CREATE TABLE matches (
-     id SERIAL PRIMARY KEY,
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     tournament_id UUID REFERENCES tournaments(id) ON DELETE CASCADE,
      round INTEGER NOT NULL,
      white_player_id VARCHAR(255) REFERENCES players(id),
      black_player_id VARCHAR(255) REFERENCES players(id),
@@ -114,13 +131,15 @@ A modern, full-featured chess tournament management system built with Next.js 15
    );
 
    -- Enable Row Level Security
-   ALTER TABLE tournament_state ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE tournaments ENABLE ROW LEVEL SECURITY;
    ALTER TABLE players ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE tournament_registrations ENABLE ROW LEVEL SECURITY;
    ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
 
    -- Create policies (adjust based on your security needs)
-   CREATE POLICY "Enable read access for all users" ON tournament_state FOR SELECT USING (true);
+   CREATE POLICY "Enable read access for all users" ON tournaments FOR SELECT USING (true);
    CREATE POLICY "Enable read access for all users" ON players FOR SELECT USING (true);
+   CREATE POLICY "Enable read access for all users" ON tournament_registrations FOR SELECT USING (true);
    CREATE POLICY "Enable read access for all users" ON matches FOR SELECT USING (true);
    ```
 

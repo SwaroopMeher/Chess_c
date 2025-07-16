@@ -9,7 +9,8 @@ import {
   Trophy, 
   Calendar, 
   BarChart3,
-  Play
+  Play,
+  UserPlus
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar'
 
 interface NavigationItem {
@@ -45,6 +47,11 @@ const navigationItems: NavigationItem[] = [
     title: 'Players',
     url: '/players',
     icon: Users,
+  },
+  {
+    title: 'Registration',
+    url: '/registration',
+    icon: UserPlus,
   },
   {
     title: 'Tournament',
@@ -76,10 +83,18 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isAdmin = false, pendingResults = 0 }: AppSidebarProps) {
   const pathname = usePathname()
+  const { isMobile, setOpenMobile } = useSidebar()
 
   const filteredItems = navigationItems.filter(item => 
     !item.adminOnly || (item.adminOnly && isAdmin)
   )
+
+  const handleNavClick = () => {
+    // Close sidebar on mobile when navigation item is clicked
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
 
   return (
     <Sidebar className="border-r border-border bg-background">
@@ -109,7 +124,7 @@ export function AppSidebar({ isAdmin = false, pendingResults = 0 }: AppSidebarPr
                       pathname === item.url && 'bg-accent text-accent-foreground'
                     )}
                   >
-                    <Link href={item.url} className="flex items-center gap-3 min-h-[2.5rem]">
+                    <Link href={item.url} className="flex items-center gap-3 min-h-[2.5rem]" onClick={handleNavClick}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span className="truncate">{item.title}</span>
                       {item.title === 'Matches' && pendingResults > 0 && (

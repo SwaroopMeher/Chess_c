@@ -127,6 +127,15 @@
   }
 }
 
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 /* Fix light mode dialog content */
 @layer components {
   /* Ensure dialog content has proper background and text colors */

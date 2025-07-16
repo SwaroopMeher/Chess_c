@@ -1,108 +1,43 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
-import { useUser } from '@clerk/nextjs'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
-import { z } from 'zod'
-import { supabase } from '@/lib/supabase'
-import { Button } from '@/components/ui/button'
+import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { toast } from 'sonner'
-
-const playerFormSchema = z.object({
-  name: z.string().min(2, {
-    message: 'Name must be at least 2 characters.',
-  }),
-  lichess_username: z.string().optional(),
-})
-
-type PlayerFormValues = z.infer<typeof playerFormSchema>
-
-interface Player {
-  id: string
-  name: string
-  lichess_username?: string
-}
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useTournament } from '@/lib/tournament-context'
+import { Trophy, Users, ExternalLink } from 'lucide-react'
 
 export default function PlayersPage() {
-  const { user } = useUser()
-  const [players, setPlayers] = useState<Player[]>([])
-  const [isRegistered, setIsRegistered] = useState(false)
+  const { state, getPlayersByTournament, isLoading } = useTournament()
 
-  const form = useForm<PlayerFormValues>({
-    resolver: zodResolver(playerFormSchema),
-    defaultValues: {
-      name: user?.firstName || user?.username || '',
-      lichess_username: '',
-    },
-    mode: 'onChange',
-  })
-
-  useEffect(() => {
-    const fetchPlayers = async () => {
-      const { data, error } = await supabase.from('players').select('*')
-      if (error) {
-        toast.error('Failed to fetch players')
-      } else {
-        setPlayers(data as Player[])
-      }
-    }
-
-    fetchPlayers()
-
-    // Set up realtime subscription for immediate updates
-    const subscription = supabase
-      .channel('players-page-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'players' }, 
-        () => {
-          fetchPlayers() // Refetch to ensure consistency
-        }
-      )
-      .subscribe()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (user && players.length > 0) {
-      setIsRegistered(players.some((p) => p.id === user.id))
-    }
-  }, [user, players])
-  
-  async function onSubmit(data: PlayerFormValues) {
-    if (!user) {
-      toast.error('You must be signed in to register.')
-      return
-    }
-
-    const { error } = await supabase.from('players').insert([
-      {
-        id: user.id,
-        name: data.name,
-        lichess_username: data.lichess_username,
-      },
-    ])
-
-    if (error) {
-      toast.error('Registration failed: ' + error.message)
-    } else {
-      toast.success('You have successfully registered for the tournament!')
-      setPlayers([...players, { id: user.id, ...data }])
-      setIsRegistered(true)
-    }
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Players</h2>
+          <p className="text-muted-foreground">
+            View players by tournament
+          </p>
+        </div>
+        <div className="grid gap-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, j) => (
+                    <Skeleton key={j} className="h-4 w-full" />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -110,89 +45,104 @@ export default function PlayersPage() {
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Players</h2>
         <p className="text-muted-foreground">
-          Register for the tournament and see who else is playing.
+          View players by tournament and their registration details
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tournament Registration</CardTitle>
-            <CardDescription>
-              {isRegistered
-                ? 'You are already registered for the tournament.'
-                : 'Register here to participate in the tournament.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!isRegistered && (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Display Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your display name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lichess_username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lichess.org Username (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., MagnusCarlsen" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button 
-                    type="submit" 
-                    disabled={form.formState.isSubmitting}
-                  >
-                    {form.formState.isSubmitting ? 'Registering...' : 'Register'}
-                  </Button>
-                </form>
-              </Form>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Registered Players</CardTitle>
-            <CardDescription>
-              A total of {players.length} players have registered.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {players.map((player) => (
-                <li key={player.id} className="flex items-center justify-between">
-                  <span>{player.name}</span>
-                  {player.lichess_username && (
-                    <a
-                      href={`https://lichess.org/@/${player.lichess_username}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-muted-foreground hover:text-primary"
-                    >
-                      @{player.lichess_username}
-                    </a>
+      <div className="space-y-6">
+        {state.tournaments.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Trophy className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No tournaments available</h3>
+              <p className="text-muted-foreground text-center">
+                No tournaments found to display players
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          state.tournaments.map((tournament) => {
+            const players = getPlayersByTournament(tournament.id)
+            const registrationCount = state.registrations.filter(r => r.tournament_id === tournament.id).length
+            
+            return (
+              <Card key={tournament.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Trophy className="h-5 w-5" />
+                        {tournament.name}
+                        <Badge variant="outline" className="gap-1">
+                          <Users className="h-3 w-3" />
+                          {registrationCount} registered
+                        </Badge>
+                        {tournament.is_active && (
+                          <Badge variant="default">Active</Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription>
+                        {tournament.description || `${tournament.format} tournament with ${tournament.total_rounds} rounds`}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>Format: {tournament.format}</span>
+                      <span>•</span>
+                      <span>Max Players: {tournament.max_players}</span>
+                      <span>•</span>
+                      <span>Rounds: {tournament.total_rounds}</span>
+                    </div>
+                  </div>
+                  
+                  {players.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground">No players registered for this tournament</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <h4 className="font-medium">Registered Players ({players.length})</h4>
+                      <div className="grid gap-2">
+                        {players.map((player, index) => (
+                          <div key={player.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-medium text-sm">
+                                {index + 1}
+                              </div>
+                              <div>
+                                <p className="font-medium">{player.name}</p>
+                                {player.lichess_username && (
+                                  <p className="text-sm text-muted-foreground">@{player.lichess_username}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {player.lichess_username && (
+                                <a
+                                  href={`https://lichess.org/@/${player.lichess_username}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  @{player.lichess_username}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            )
+          })
+        )}
       </div>
     </div>
   )

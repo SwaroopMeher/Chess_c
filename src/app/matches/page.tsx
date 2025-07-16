@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useTournament } from '@/lib/tournament-context'
 import { supabase } from '@/lib/supabase'
@@ -8,66 +8,28 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Trophy, Clock, CheckCircle, AlertCircle } from 'lucide-react'
-
-interface Match {
-  id: string
-  round: number
-  white_player_id: string
-  black_player_id: string
-  white_player_name: string
-  black_player_name: string
-  result?: string
-  scheduled_at?: string
-}
+import { Trophy, Clock, CheckCircle, AlertCircle, Users, FileText, Info } from 'lucide-react'
 
 export default function MatchesPage() {
   const { user } = useUser()
-  const { tournamentState } = useTournament()
-  const [matches, setMatches] = useState<Match[]>([])
-  const [players, setPlayers] = useState<Array<{ id: string; name?: string; [key: string]: unknown }>>([])
-  const [loading, setLoading] = useState(true)
+  const { state, getMatchesByTournament, getTournamentById, isLoading } = useTournament()
+  const [selectedTournamentId, setSelectedTournamentId] = useState<string>('')
   const [submittingResult, setSubmittingResult] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [matchesResult, playersResult] = await Promise.all([
-          supabase.from('matches').select('*').order('round', { ascending: true }),
-          supabase.from('players').select('*')
-        ])
-
-        if (matchesResult.error) throw matchesResult.error
-        if (playersResult.error) throw playersResult.error
-        
-        setMatches(matchesResult.data as Match[])
-        setPlayers(playersResult.data || [])
-      } catch {
-        toast.error('Failed to load data')
-      } finally {
-        setLoading(false)
-      }
+  // Auto-select first active tournament if none selected, clear if selected is inactive
+  React.useEffect(() => {
+    const activeTournaments = state.tournaments.filter(t => t.is_active)
+    
+    if (!selectedTournamentId && activeTournaments.length > 0) {
+      setSelectedTournamentId(activeTournaments[0].id)
+    } else if (selectedTournamentId && !activeTournaments.some(t => t.id === selectedTournamentId)) {
+      // If currently selected tournament is not active, clear selection
+      setSelectedTournamentId(activeTournaments.length > 0 ? activeTournaments[0].id : '')
     }
-
-    fetchData()
-
-    // Set up real-time subscription for match updates
-    const subscription = supabase
-      .channel('matches-page-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'matches' }, 
-        () => {
-          fetchData() // Refetch matches on any change
-        }
-      )
-      .subscribe()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
+  }, [state.tournaments, selectedTournamentId])
 
   const submitResult = async (matchId: string, result: string) => {
     setSubmittingResult(matchId)
@@ -81,15 +43,6 @@ export default function MatchesPage() {
       if (matchError) throw matchError
 
       toast.success('Match result submitted successfully!')
-      
-      // Refetch matches to show updated state
-      const { data, error } = await supabase
-        .from('matches')
-        .select('*')
-        .order('round', { ascending: true })
-
-      if (error) throw error
-      setMatches(data as Match[])
 
     } catch {
       toast.error('Failed to submit result')
@@ -98,16 +51,18 @@ export default function MatchesPage() {
     }
   }
 
-  const canSubmitResult = (match: Match) => {
+  const canSubmitResult = (match: any) => {
     if (match.result) return false // Already has result
     
-    // Check if tournament is active
-    if (!tournamentState.is_active) return false
+    const tournament = getTournamentById(selectedTournamentId)
+    
+    // Check if tournament exists and is active
+    if (!tournament || !tournament.is_active) return false
     
     if (!user?.id) return false
 
     // Find the user's player record by Clerk user ID
-    const userPlayer = players.find(player => player.id === user.id)
+    const userPlayer = state.players.find(player => player.id === user.id)
     
     if (!userPlayer) return false
 
@@ -130,13 +85,17 @@ export default function MatchesPage() {
     }
   }
 
+  const selectedTournament = getTournamentById(selectedTournamentId)
+  const matches = selectedTournamentId ? getMatchesByTournament(selectedTournamentId) : []
+  const activeTournaments = state.tournaments.filter(t => t.is_active)
+  
   const getMatchesByStatus = () => {
     const pending = matches.filter(m => !m.result)
     const completed = matches.filter(m => m.result)
     return { pending, completed }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
@@ -161,11 +120,136 @@ export default function MatchesPage() {
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Match Results</h2>
         <p className="text-muted-foreground">
-          Submit and view match results for the tournament.
+          Submit and view match results by tournament.
         </p>
       </div>
 
-      {matches.length === 0 ? (
+      {/* Tournament Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5" />
+            Select Tournament
+          </CardTitle>
+          <CardDescription>
+            Choose a tournament to view its matches
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedTournamentId} onValueChange={setSelectedTournamentId}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select an active tournament" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border border-border">
+              {activeTournaments.length === 0 ? (
+                <div className="p-2 text-center text-muted-foreground text-sm">
+                  No active tournaments available
+                </div>
+              ) : (
+                activeTournaments.map((tournament) => (
+                  <SelectItem key={tournament.id} value={tournament.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{tournament.name}</span>
+                      <Badge variant="default" className="text-xs">Active</Badge>
+                    </div>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+          {selectedTournament && (
+            <div className="mt-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-4">
+                <span>Format: {selectedTournament.format}</span>
+                <span>•</span>
+                <span>Rounds: {selectedTournament.total_rounds}</span>
+                <span>•</span>
+                <span>Status: {selectedTournament.is_active ? 'Active' : 'Inactive'}</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tournament Rules Section */}
+      {selectedTournament && (selectedTournament.rules || selectedTournament.format) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Tournament Information
+            </CardTitle>
+            <CardDescription>
+              Rules and format details for {selectedTournament.name}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Format Information */}
+            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Format: {selectedTournament.format}</h4>
+                  <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                    {selectedTournament.format === 'Round Robin' && (
+                      <>
+                        <p>• Every player plays against every other player exactly once</p>
+                        <p>• Fair color distribution: players get equal opportunities as white and black</p>
+                      </>
+                    )}
+                    {selectedTournament.format === 'Swiss' && (
+                      <>
+                        <p>• Players are paired based on performance and ratings</p>
+                        <p>• Fair color distribution: alternating colors based on seeding</p>
+                        <p>• Stronger players face stronger opponents as tournament progresses</p>
+                        <p>• Total rounds: {selectedTournament.total_rounds}</p>
+                      </>
+                    )}
+                    <p>• Max players: {selectedTournament.max_players}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Rules */}
+            {selectedTournament.rules && (
+              <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-2">Tournament Rules</h4>
+                    <div className="text-sm text-amber-800 dark:text-amber-200 whitespace-pre-wrap">
+                      {selectedTournament.rules}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTournaments.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Active Tournaments</h3>
+            <p className="text-muted-foreground text-center">
+              There are no active tournaments available. Tournament admin needs to activate a tournament first.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !selectedTournamentId ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Trophy className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">Select a Tournament</h3>
+            <p className="text-muted-foreground text-center">
+              Choose an active tournament above to view its matches
+            </p>
+          </CardContent>
+        </Card>
+      ) : matches.length === 0 ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
