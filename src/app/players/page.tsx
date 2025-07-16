@@ -12,14 +12,14 @@ export default function PlayersPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Players</h2>
-          <p className="text-muted-foreground">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Players</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             View players by tournament
           </p>
         </div>
-        <div className="grid gap-6">
+        <div className="grid gap-4 sm:gap-6">
           {Array.from({ length: 2 }).map((_, i) => (
             <Card key={i}>
               <CardHeader>
@@ -41,15 +41,15 @@ export default function PlayersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Players</h2>
-        <p className="text-muted-foreground">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="space-y-2">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Players</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">
           View players by tournament and their registration details
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {state.tournaments.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -68,33 +68,33 @@ export default function PlayersPage() {
             return (
               <Card key={tournament.id}>
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Trophy className="h-5 w-5" />
-                        {tournament.name}
-                        <Badge variant="outline" className="gap-1">
-                          <Users className="h-3 w-3" />
-                          {registrationCount} registered
-                        </Badge>
-                        {tournament.is_active && (
-                          <Badge variant="default">Active</Badge>
-                        )}
-                      </CardTitle>
-                      <CardDescription>
-                        {tournament.description || `${tournament.format} tournament with ${tournament.total_rounds} rounds`}
-                      </CardDescription>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Trophy className="h-5 w-5 flex-shrink-0" />
+                      <CardTitle className="flex-1 min-w-0">{tournament.name}</CardTitle>
                     </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="gap-1 flex-shrink-0">
+                        <Users className="h-3 w-3" />
+                        {registrationCount} registered
+                      </Badge>
+                      {tournament.is_active && (
+                        <Badge variant="default" className="flex-shrink-0">Active</Badge>
+                      )}
+                    </div>
+                    <CardDescription className="break-words">
+                      {tournament.description || `${tournament.format} tournament with ${tournament.total_rounds} rounds`}
+                    </CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Format: {tournament.format}</span>
-                      <span>•</span>
-                      <span>Max Players: {tournament.max_players}</span>
-                      <span>•</span>
-                      <span>Rounds: {tournament.total_rounds}</span>
+                    <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+                      <span className="flex-shrink-0">Format: {tournament.format}</span>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="flex-shrink-0">Max Players: {tournament.max_players}</span>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="flex-shrink-0">Rounds: {tournament.total_rounds}</span>
                     </div>
                   </div>
                   
@@ -108,30 +108,34 @@ export default function PlayersPage() {
                       <h4 className="font-medium">Registered Players ({players.length})</h4>
                       <div className="grid gap-2">
                         {players.map((player, index) => (
-                          <div key={player.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-medium text-sm">
+                          <div key={player.id} className="p-3 rounded-lg border bg-card">
+                            <div className="flex items-start gap-3">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-medium text-sm flex-shrink-0">
                                 {index + 1}
                               </div>
-                              <div>
-                                <p className="font-medium">{player.name}</p>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <p className="font-medium truncate">{player.name}</p>
+                                  {player.lichess_username && (
+                                    <a
+                                      href={`https://lichess.org/@/${player.lichess_username}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary flex-shrink-0"
+                                      title={`View @${player.lichess_username} on Lichess`}
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                      <span className="hidden sm:inline">@{player.lichess_username}</span>
+                                      <span className="sm:hidden">Lichess</span>
+                                    </a>
+                                  )}
+                                </div>
                                 {player.lichess_username && (
-                                  <p className="text-sm text-muted-foreground">@{player.lichess_username}</p>
+                                  <p className="text-sm text-muted-foreground truncate">
+                                    @{player.lichess_username}
+                                  </p>
                                 )}
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {player.lichess_username && (
-                                <a
-                                  href={`https://lichess.org/@/${player.lichess_username}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                  @{player.lichess_username}
-                                </a>
-                              )}
                             </div>
                           </div>
                         ))}
