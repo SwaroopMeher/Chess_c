@@ -70,6 +70,7 @@ type TournamentAction =
   | { type: 'UPDATE_TOURNAMENT'; payload: Tournament }
   | { type: 'ADD_REGISTRATION'; payload: TournamentRegistration }
   | { type: 'REMOVE_REGISTRATION'; payload: { tournament_id: string; player_id: string } }
+  | { type: 'UPDATE_MATCH'; payload: Match }
 
 const initialState: TournamentState = {
   tournaments: [],
@@ -112,6 +113,13 @@ function tournamentReducer(state: TournamentState, action: TournamentAction): To
           !(r.tournament_id === action.payload.tournament_id && r.player_id === action.payload.player_id)
         )
       }
+    case 'UPDATE_MATCH':
+      return {
+        ...state,
+        matches: state.matches.map(m => 
+          m.id === action.payload.id ? action.payload : m
+        )
+      }
     default:
       return state
   }
@@ -129,6 +137,9 @@ interface TournamentContextValue {
   // Registration actions
   registerForTournament: (tournamentId: string, playerId: string) => Promise<void>
   unregisterFromTournament: (tournamentId: string, playerId: string) => Promise<void>
+  
+  // Match actions
+  submitMatchResult: (matchId: string, result: string) => Promise<void>
   
   // Utility functions
   getTournamentById: (id: string) => Tournament | undefined
@@ -443,6 +454,47 @@ export function TournamentProvider({ children }: { children: React.ReactNode }) 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       console.error('Error unregistering from tournament:', errorMessage, error)
       toast.error(`Failed to unregister from tournament: ${errorMessage}`)
+    }
+  }
+
+  const submitMatchResult = async (matchId: string, result: string) => {
+    try {
+      // Find the match to update
+      const match = state.matches.find(m => m.id === matchId)
+      if (!match) {
+        throw new Error('Match not found')
+      }
+
+      // Update match result in database
+      const { data, error } = await supabase
+        .from('matches')
+        .update({ result })
+        .eq('id', matchId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw new Error(error.message || error.details || 'Failed to submit match result')
+      }
+
+      if (!data) {
+        throw new Error('No data returned from match result update')
+      }
+
+      // Update local state
+      dispatch({ type: 'UPDATE_MATCH', payload: data as Match })
+      toast.success('Match result submitted successfully!')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      console.error('Error submitting match result:', errorMessage, error)
+      toast.error(`Failed to submit match result: ${errorMessage}`)
+      throw error
     }
   }
 
@@ -844,6 +896,7 @@ export function TournamentProvider({ children }: { children: React.ReactNode }) 
     regenerateSchedule,
     registerForTournament,
     unregisterFromTournament,
+    submitMatchResult,
     getTournamentById,
     getPlayersByTournament,
     getMatchesByTournament,

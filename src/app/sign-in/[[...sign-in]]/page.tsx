@@ -1,10 +1,10 @@
 import { SignIn } from '@clerk/nextjs'
 import { BackgroundPaths } from "@/components/ui/background-paths";
+import { ClerkWithThemeToggle } from "@/components/ClerkWithThemeToggle";
 
 export default function SignInPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background relative overflow-hidden">
-      <BackgroundPaths />
+    <ClerkWithThemeToggle>
       <div className="w-full max-w-md mx-auto relative z-10">
         <SignIn 
           appearance={{
@@ -31,6 +31,6 @@ export default function SignInPage() {
           }}
         />
       </div>
-    </div>
+    </ClerkWithThemeToggle>
   )
 } 

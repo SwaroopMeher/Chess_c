@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { MainLayout } from '@/components/layout/main-layout'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { BackgroundPaths } from '@/components/ui/background-paths'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useEffect } from "react";
 
 interface AuthWrapperProps {
@@ -74,6 +75,10 @@ export function AuthWrapper({ children, setShowGlobalBackground }: AuthWrapperPr
           {/* TEMPORARY DEBUG: Red overlay to test stacking */}
           <div className="fixed inset-0 bg-red-500 opacity-50 z-50 pointer-events-none"></div>
           <BackgroundPaths />
+        </div>
+        {/* Theme Toggle */}
+        <div className="absolute top-4 right-4 z-50">
+          <ThemeToggle />
         </div>
         <div className="text-center max-w-md mx-auto mx-4 sm:mx-auto p-8 px-4 sm:px-8 bg-background rounded-xl border border-border shadow-lg relative z-10">
           <div className="mb-6">

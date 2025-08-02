@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Trophy, Users, Calendar, BarChart3 } from 'lucide-react'
 import { useTournament } from '@/lib/tournament-context'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export default function Home() {
   const { state, getPlayersByTournament, getMatchesByTournament, getTournamentById, isLoading } = useTournament()
@@ -88,11 +89,14 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Tournament Dashboard</h2>
-        <p className="text-muted-foreground">
-          Welcome to the chess tournament management system
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Tournament Dashboard</h2>
+          <p className="text-muted-foreground">
+            Welcome to the chess tournament management system
+          </p>
+        </div>
+        <ThemeToggle />
       </div>
 
       {/* Tournament Selection */}

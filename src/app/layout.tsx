@@ -4,6 +4,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import { ThemeProvider } from "@/lib/theme"
 import { Toaster } from 'sonner'
 import { ClientLayoutWrapper } from "@/components/ClientLayoutWrapper";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import "./globals.css";
 
 const geistSans = Geist({

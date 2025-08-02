@@ -15,9 +15,10 @@ import { Trophy, Clock, CheckCircle, AlertCircle, Users, FileText, Info } from '
 
 export default function MatchesPage() {
   const { user } = useUser()
-  const { state, getMatchesByTournament, getTournamentById, isLoading } = useTournament()
+  const { state, getMatchesByTournament, getTournamentById, submitMatchResult, refreshData, isLoading } = useTournament()
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>('')
   const [submittingResult, setSubmittingResult] = useState<string | null>(null)
+  const [openModal, setOpenModal] = useState<string | null>(null)
 
   // Auto-select first active tournament if none selected, clear if selected is inactive
   React.useEffect(() => {
@@ -34,18 +35,10 @@ export default function MatchesPage() {
   const submitResult = async (matchId: string, result: string) => {
     setSubmittingResult(matchId)
     try {
-      // Update match result
-      const { error: matchError } = await supabase
-        .from('matches')
-        .update({ result })
-        .eq('id', matchId)
-
-      if (matchError) throw matchError
-
-      toast.success('Match result submitted successfully!')
-
-    } catch {
-      toast.error('Failed to submit result')
+      await submitMatchResult(matchId, result)
+      setOpenModal(null) // Close the modal after successful submission
+    } catch (error) {
+      // Error is already handled by the context function
     } finally {
       setSubmittingResult(null)
     }
@@ -114,6 +107,56 @@ export default function MatchesPage() {
   }
 
   const { pending, completed } = getMatchesByStatus()
+
+  // Function to create dummy data for testing
+  const createDummyData = async () => {
+    try {
+      // Create dummy players
+      const dummyPlayers = [
+        { name: 'Aditya', email: 'aditya@example.com', lichess_username: 'aditya_chess' },
+        { name: 'Swaroop', email: 'swaroop@example.com', lichess_username: 'swaroop_chess' },
+        { name: 'Priya', email: 'priya@example.com', lichess_username: 'priya_chess' },
+        { name: 'Rahul', email: 'rahul@example.com', lichess_username: 'rahul_chess' }
+      ]
+
+      for (const player of dummyPlayers) {
+        const { error } = await supabase
+          .from('players')
+          .insert([player])
+          .select()
+        
+        if (error && !error.message.includes('duplicate')) {
+          console.error('Error creating player:', error)
+        }
+      }
+
+      // Create a dummy tournament if none exists
+      if (activeTournaments.length === 0) {
+        const { data: tournament, error: tournamentError } = await supabase
+          .from('tournaments')
+          .insert([{
+            name: 'Test Tournament',
+            description: 'A test tournament for development',
+            format: 'Round Robin',
+            max_players: 8,
+            total_rounds: 3,
+            created_by: 'admin'
+          }])
+          .select()
+          .single()
+
+        if (tournamentError && !tournamentError.message.includes('duplicate')) {
+          console.error('Error creating tournament:', tournamentError)
+        }
+      }
+
+      toast.success('Dummy data created! Refreshing data...')
+      await refreshData()
+    } catch (error) {
+      console.error('Error creating dummy data:', error)
+      toast.error('Failed to create dummy data')
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -234,9 +277,12 @@ export default function MatchesPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No Active Tournaments</h3>
-            <p className="text-muted-foreground text-center">
+            <p className="text-muted-foreground text-center mb-4">
               There are no active tournaments available. Tournament admin needs to activate a tournament first.
             </p>
+            <Button onClick={createDummyData} variant="outline">
+              Create Test Data
+            </Button>
           </CardContent>
         </Card>
       ) : !selectedTournamentId ? (
@@ -297,7 +343,7 @@ export default function MatchesPage() {
                       <div className="flex items-center justify-between sm:justify-end gap-3">
                         {getResultBadge(match.result)}
                         {canSubmitResult(match) && (
-                          <Dialog>
+                          <Dialog open={openModal === match.id} onOpenChange={(open) => setOpenModal(open ? match.id : null)}>
                             <DialogTrigger asChild>
                               <Button 
                                 size="sm" 
@@ -306,7 +352,7 @@ export default function MatchesPage() {
                                 Submit Result
                               </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="sm:max-w-md">
                               <DialogHeader>
                                 <DialogTitle>Submit Match Result</DialogTitle>
                                 <DialogDescription>
@@ -314,29 +360,62 @@ export default function MatchesPage() {
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="grid gap-4 py-4">
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-3 gap-4">
                                   <Button 
                                     variant="default" 
-                                    className="bg-green-500 hover:bg-green-600"
+                                    className="bg-white text-black hover:bg-gray-100 border-2 border-gray-300 font-semibold min-h-[80px] px-2"
                                     onClick={() => submitResult(match.id, '1-0')}
                                     disabled={submittingResult === match.id}
                                   >
-                                    White Wins
+                                    {submittingResult === match.id ? (
+                                      <div className="text-center">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mx-auto mb-1"></div>
+                                        <div className="text-xs">Submitting...</div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-center w-full">
+                                        <div className="text-xs opacity-75 mb-1">White</div>
+                                        <div className="font-bold text-sm leading-tight mb-1 break-words">{match.white_player_name}</div>
+                                        <div className="text-xs">Wins</div>
+                                      </div>
+                                    )}
                                   </Button>
                                   <Button 
                                     variant="secondary"
+                                    className="bg-gray-500 text-white hover:bg-gray-600 font-semibold min-h-[80px] px-2"
                                     onClick={() => submitResult(match.id, '1/2-1/2')}
                                     disabled={submittingResult === match.id}
                                   >
-                                    Draw
+                                    {submittingResult === match.id ? (
+                                      <div className="text-center">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto mb-1"></div>
+                                        <div className="text-xs">Submitting...</div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-center w-full">
+                                        <div className="text-xs opacity-75 mb-1">Draw</div>
+                                        <div className="font-bold text-sm leading-tight mb-1">½ - ½</div>
+                                      </div>
+                                    )}
                                   </Button>
                                   <Button 
                                     variant="default" 
-                                    className="bg-blue-500 hover:bg-blue-600"
+                                    className="bg-gray-800 text-white hover:bg-gray-700 border-2 border-gray-600 font-semibold min-h-[80px] px-2"
                                     onClick={() => submitResult(match.id, '0-1')}
                                     disabled={submittingResult === match.id}
                                   >
-                                    Black Wins
+                                    {submittingResult === match.id ? (
+                                      <div className="text-center">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto mb-1"></div>
+                                        <div className="text-xs">Submitting...</div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-center w-full">
+                                        <div className="text-xs opacity-75 mb-1">Black</div>
+                                        <div className="font-bold text-sm leading-tight mb-1 break-words">{match.black_player_name}</div>
+                                        <div className="text-xs">Wins</div>
+                                      </div>
+                                    )}
                                   </Button>
                                 </div>
                               </div>
